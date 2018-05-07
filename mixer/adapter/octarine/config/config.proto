@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package adapter.octarine.config;
+
+import "google/protobuf/duration.proto";
+import "gogoproto/gogo.proto";
+
+option go_package="config";
+
+message Params {
+    string flagsFile = 1;
+    string namespace = 2;
+    string deployment = 3;
+    string messageProxyAddress = 4;
+    string messageProxyCA = 5;
+    string backendAddress = 6;
+    string initialAccessToken = 7;
+}
