@@ -27,6 +27,7 @@ import (
 	list "istio.io/istio/mixer/adapter/list"
 	memquota "istio.io/istio/mixer/adapter/memquota"
 	noop "istio.io/istio/mixer/adapter/noop"
+	octarine "istio.io/istio/mixer/adapter/octarine"
 	opa "istio.io/istio/mixer/adapter/opa"
 	prometheus "istio.io/istio/mixer/adapter/prometheus"
 	rbac "istio.io/istio/mixer/adapter/rbac"
@@ -53,6 +54,7 @@ func Inventory() []adptr.InfoFn {
 		list.GetInfo,
 		memquota.GetInfo,
 		noop.GetInfo,
+		octarine.GetInfo,
 		opa.GetInfo,
 		prometheus.GetInfo,
 		rbac.GetInfo,
