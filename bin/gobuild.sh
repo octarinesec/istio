@@ -36,11 +36,12 @@ GOARCH=${GOARCH:-amd64}
 GOBINARY=${GOBINARY:-go}
 GOPKG="$GOPATH/pkg"
 BUILDINFO=${BUILDINFO:-""}
-STATIC=${STATIC:-1}
+STATIC=${STATIC:-0}
 LDFLAGS="-extldflags -static"
+# LDFLAGS="-extldflags -static -L /root/go/src/golang.octarinesec.com/liboctarine"
 GOBUILDFLAGS=${GOBUILDFLAGS:-""}
 GCFLAGS=${GCFLAGS:-}
-export CGO_ENABLED=0
+export CGO_ENABLED=1
 
 if [[ "${STATIC}" !=  "1" ]];then
     LDFLAGS=""
