@@ -208,6 +208,8 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 		ValidUseCount: 1000,
 	}
 
+	h.env.Logger().Infof("Sending result: %+v\n", result)
+
 	return result, nil
 }
 
@@ -298,7 +300,7 @@ func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Inst
 			}
 		}
 
-		h.octarine.HandleP2PRequest(true, liboctarine.LogOnly, isIncoming, request)
+		h.octarine.HandleP2PRequest(true, liboctarine.CheckAndLog, isIncoming, request)
 	}
 	return nil
 }
