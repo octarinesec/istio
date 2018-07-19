@@ -185,6 +185,7 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 	}
 
 	code := h.octarine.HandleP2PRequest(true, liboctarine.CheckOnly, isIncoming, request)
+	h.env.Logger().Infof("Result from liboctarine: %d", code)
 
 	statusCode := int32(0)
 	statusMsg := ""
@@ -216,6 +217,8 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 // logentry.Handler#HandleLogEntry
 func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Instance) error {
 	for _, instance := range instances {
+		fmt.Printf("instance variables: %+v\n", instance.Variables)
+
 		if _, ok := h.logentryTypes[instance.Name]; !ok {
 			h.env.Logger().Errorf("Cannot find Type for instance %s", instance.Name)
 			continue
@@ -300,7 +303,8 @@ func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Inst
 			}
 		}
 
-		h.octarine.HandleP2PRequest(true, liboctarine.CheckAndLog, isIncoming, request)
+		code := h.octarine.HandleP2PRequest(true, liboctarine.CheckAndLog, isIncoming, request)
+		h.env.Logger().Infof("Result from liboctarine: %d", code)
 	}
 	return nil
 }
