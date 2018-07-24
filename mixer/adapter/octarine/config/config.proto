@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+// config for octarine adapter
+package adapter.octarine.config;
+
+import "gogoproto/gogo.proto";
+
+option go_package="config";
+
+// config for octarine adapter
+message Params {
+    string namespace = 1;
+    string deployment = 2;
+}
