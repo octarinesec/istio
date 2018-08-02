@@ -1,21 +1,20 @@
 package main
 
 import (
-	"fmt"
+	"flag"
 	"os"
 
+	"github.com/golang/glog"
 	octarineadapter "istio.io/istio/mixer/adapter/octarine"
 )
 
 func main() {
-	addr := "7782"
-	if len(os.Args) > 1 {
-		addr = os.Args[1]
-	}
+	port := flag.String("port", "7782", "Port of the service.")
+	flag.Parse()
 
-	s, err := octarineadapter.NewOctarineAdapter(addr, "", "", "", "", "/octarine_id/gflags")
+	s, err := octarineadapter.NewOctarineAdapter(*port, "", "", "", "", "/octarine_id/gflags")
 	if err != nil {
-		fmt.Printf("unable to start sever: %v", err)
+		glog.Errorf("unable to start sever: %v", err)
 		os.Exit(-1)
 	}
 
