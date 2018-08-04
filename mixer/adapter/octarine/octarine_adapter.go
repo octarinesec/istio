@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -59,45 +58,32 @@ func (s *OctarineAdapter) HandleLogEntry(ctx context.Context, request *logentry.
 		fmt.Printf("instance variables: %+v\n", instance.Variables)
 
 		sourceSocket := liboctarine.ExternalSocketInfo{
-			Address: instance.Variables["sourceIp"].GetIpAddressValue().String(),
+			// Address: instance.Variables["sourceIp"].GetIpAddressValue().String(),
+			Address: "0.0.0.0",
 		}
 
 		destinationSocket := liboctarine.ExternalSocketInfo{
-			Address: instance.Variables["destinationIp"].GetIpAddressValue().String(),
-		}
-
-		sourceName := instance.Variables["sourceName"].GetStringValue()
-		if sourceName == "" {
-			e := strings.Split(instance.Variables["sourceAddress"].GetStringValue(), ".")
-			if len(e) > 0 {
-				sourceName = e[0]
-			}
-		}
-
-		destinationName := instance.Variables["destinationName"].GetStringValue()
-		if destinationName == "" {
-			e := strings.Split(instance.Variables["destinationAddress"].GetStringValue(), ".")
-			if len(e) > 0 {
-				destinationName = e[0]
-			}
+			// Address: instance.Variables["destinationIp"].GetIpAddressValue().String(),
+			Address: "0.0.0.0",
+			Port:    int(instance.Variables["destinationPort"].GetInt64Value()),
 		}
 
 		sourceService := fmt.Sprintf("%s:%s@%s",
-			instance.Variables["sourceNamespace"].GetStringValue(),
-			sourceName,
+			instance.Variables["sourceWorkloadNamespace"].GetStringValue(),
+			instance.Variables["sourceWorkloadName"].GetStringValue(),
 			cfg.Deployment,
 		)
 
 		destinationService := fmt.Sprintf("%s:%s@%s",
-			instance.Variables["destinationNamespace"].GetStringValue(),
-			destinationName,
+			instance.Variables["destinationWorkloadNamespace"].GetStringValue(),
+			instance.Variables["destinationWorkloadName"].GetStringValue(),
 			cfg.Deployment,
 		)
 
 		// If the response duration is 0, we're most likely outbound
-		zeroDuration, _ := time.ParseDuration("0ms")
-		requestDuration := instance.Variables["responseDuration"].GetDurationValue()
-		outbound := requestDuration.Equal(zeroDuration)
+		// zeroDuration, _ := time.ParseDuration("0ms")
+		// requestDuration := instance.Variables["responseDuration"].GetDurationValue()
+		outbound := true
 
 		var request liboctarine.ExternalRequest
 		var isIncoming int
@@ -159,38 +145,25 @@ func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *
 	instance := authRequest.Instance
 
 	sourceSocket := liboctarine.ExternalSocketInfo{
-		Address: instance.Subject.Properties["sourceIp"].GetIpAddressValue().String(),
+		// Address: instance.Variables["sourceIp"].GetIpAddressValue().String(),
+		Address: "0.0.0.0",
 	}
 
 	destinationSocket := liboctarine.ExternalSocketInfo{
-		Address: instance.Action.Properties["destinationIp"].GetIpAddressValue().String(),
-	}
-
-	sourceName := instance.Subject.Properties["sourceName"].GetStringValue()
-	if sourceName == "" {
-		e := strings.Split(instance.Subject.Properties["sourceAddress"].GetStringValue(), ".")
-		if len(e) > 0 {
-			sourceName = e[0]
-		}
-	}
-
-	destinationName := instance.Action.Properties["destinationName"].GetStringValue()
-	if destinationName == "" {
-		e := strings.Split(instance.Action.Service, ".")
-		if len(e) > 0 {
-			destinationName = e[0]
-		}
+		// Address: instance.Variables["destinationIp"].GetIpAddressValue().String(),
+		Address: "0.0.0.0",
+		Port:    int(instance.Action.Properties["destinationPort"].GetInt64Value()),
 	}
 
 	sourceService := fmt.Sprintf("%s:%s@%s",
-		instance.Subject.Properties["sourceNamespace"].GetStringValue(),
-		sourceName,
+		instance.Subject.Properties["sourceWorkloadNamespace"].GetStringValue(),
+		instance.Subject.Properties["sourceWorkloadName"].GetStringValue(),
 		cfg.Deployment,
 	)
 
 	destinationService := fmt.Sprintf("%s:%s@%s",
-		instance.Action.Namespace,
-		destinationName,
+		instance.Action.Properties["destinationWorkloadNamespace"].GetStringValue(),
+		instance.Action.Properties["destinationWorkloadName"].GetStringValue(),
 		cfg.Deployment,
 	)
 
