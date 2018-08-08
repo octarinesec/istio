@@ -8,10 +8,9 @@ package octarineadapter
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"time"
-
-	"github.com/golang/glog"
 
 	"github.com/gogo/googleapis/google/rpc"
 	"golang.octarinesec.com/liboctarine"
@@ -33,9 +32,10 @@ type (
 
 	// OctarineAdapter supports logentry and authorization templates
 	OctarineAdapter struct {
-		listener net.Listener
-		server   *grpc.Server
-		octarine liboctarine.LibOctarine
+		listener       net.Listener
+		server         *grpc.Server
+		octarine       liboctarine.LibOctarine
+		serviceManager *ServiceManager
 	}
 )
 
@@ -44,12 +44,12 @@ var _ authorization.HandleAuthorizationServiceServer = &OctarineAdapter{}
 
 // HandleLogEntry reports activity to the Octarine control plane
 func (s *OctarineAdapter) HandleLogEntry(ctx context.Context, request *logentry.HandleLogEntryRequest) (*v1beta1.ReportResult, error) {
-	glog.Infof("received request %v\n", *request)
+	log.Printf("received log request %v\n", *request)
 	cfg := &config.Params{}
 
 	if request.AdapterConfig != nil {
 		if err := cfg.Unmarshal(request.AdapterConfig.Value); err != nil {
-			glog.Errorf("error unmarshalling adapter config: %v", err)
+			log.Printf("error unmarshalling adapter config: %v", err)
 			return nil, err
 		}
 	}
@@ -80,6 +80,26 @@ func (s *OctarineAdapter) HandleLogEntry(ctx context.Context, request *logentry.
 			cfg.Deployment,
 		)
 
+		sourceInstanceID := instance.Variables["sourceUid"].GetStringValue()
+		destinationInstanceID := instance.Variables["destinationUid"].GetStringValue()
+
+		sourceVersion := instance.Variables["sourceVersion"].GetStringValue()
+		destinationVersion := instance.Variables["destinationVersion"].GetStringValue()
+
+		destinationHostname := instance.Variables["destinationServiceHost"].GetStringValue()
+
+		go func() {
+			if err := s.serviceManager.ObserveInstance(
+				sourceService, sourceInstanceID, sourceVersion, ""); err != nil {
+				log.Printf("failed to register instance %s: %v", sourceService, err)
+			}
+			if err := s.serviceManager.ObserveInstance(
+				destinationService, destinationInstanceID, destinationVersion,
+				destinationHostname); err != nil {
+				log.Printf("failed to register instance %s: %v", destinationService, err)
+			}
+		}()
+
 		// If the response duration is 0, we're most likely outbound
 		// zeroDuration, _ := time.ParseDuration("0ms")
 		// requestDuration := instance.Variables["responseDuration"].GetDurationValue()
@@ -89,7 +109,7 @@ func (s *OctarineAdapter) HandleLogEntry(ctx context.Context, request *logentry.
 		var isIncoming int
 
 		if outbound {
-			isIncoming = 2
+			isIncoming = 0
 			request = liboctarine.ExternalRequest{
 				Protocol:         instance.Variables["protocol"].GetStringValue(),
 				MessageID:        0,
@@ -125,19 +145,19 @@ func (s *OctarineAdapter) HandleLogEntry(ctx context.Context, request *logentry.
 		}
 
 		code := s.octarine.HandleP2PRequest(true, liboctarine.CheckAndLog, isIncoming, request)
-		glog.Infof("Result from liboctarine: %d", code)
+		log.Printf("Log result from liboctarine: %d", code)
 	}
 	return nil, nil
 }
 
 // HandleAuthorization reports activity to the Octarine control plane
 func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *authorization.HandleAuthorizationRequest) (*v1beta1.CheckResult, error) {
-	glog.Infof("received request %v\n", *authRequest)
+	log.Printf("received auth request %v\n", *authRequest)
 	cfg := &config.Params{}
 
 	if authRequest.AdapterConfig != nil {
 		if err := cfg.Unmarshal(authRequest.AdapterConfig.Value); err != nil {
-			glog.Errorf("error unmarshalling adapter config: %v", err)
+			log.Printf("error unmarshalling adapter config: %v", err)
 			return nil, err
 		}
 	}
@@ -166,6 +186,26 @@ func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *
 		instance.Action.Properties["destinationWorkloadName"].GetStringValue(),
 		cfg.Deployment,
 	)
+
+	sourceInstanceID := instance.Subject.Properties["sourceUid"].GetStringValue()
+	destinationInstanceID := instance.Action.Properties["destinationUid"].GetStringValue()
+
+	sourceVersion := instance.Subject.Properties["sourceVersion"].GetStringValue()
+	destinationVersion := instance.Action.Properties["destinationVersion"].GetStringValue()
+
+	destinationHostname := instance.Action.Properties["destinationServiceHost"].GetStringValue()
+
+	go func() {
+		if err := s.serviceManager.ObserveInstance(
+			sourceService, sourceInstanceID, sourceVersion, ""); err != nil {
+			log.Printf("failed to register instance %s: %v", sourceService, err)
+		}
+		if err := s.serviceManager.ObserveInstance(
+			destinationService, destinationInstanceID, destinationVersion,
+			destinationHostname); err != nil {
+			log.Printf("failed to register instance %s: %v", destinationService, err)
+		}
+	}()
 
 	var outbound bool
 	// If the destination UID is empty, this is egress traffic which means it's outbound.
@@ -215,7 +255,7 @@ func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *
 	}
 
 	code := s.octarine.HandleP2PRequest(true, liboctarine.CheckOnly, isIncoming, request)
-	glog.Infof("Result from liboctarine: %d", code)
+	log.Printf("Auth result from liboctarine: %d", code)
 
 	statusCode := int32(0)
 	statusMsg := ""
@@ -239,7 +279,7 @@ func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *
 		ValidUseCount: 1000,
 	}
 
-	glog.Infof("Sending result: %+v\n", result)
+	log.Printf("Sending auth result: %+v\n", result)
 
 	return result, nil
 }
@@ -267,9 +307,8 @@ func (s *OctarineAdapter) Close() error {
 	return nil
 }
 
-// NewOctarineAdapter creates a new IBP adapter that listens at provided port.
-func NewOctarineAdapter(port string, proxyAddress string, proxyCACertFile string,
-	backendAddress string, accessTokenFile string, flagsFile string) (Server, error) {
+// NewOctarineAdapter creates a new adapter that listens at provided port.
+func NewOctarineAdapter(port string, flagsFile string) (Server, error) {
 	// l := liboctarine.LibOctarine{
 	// 	MessageProxyAddress: proxyAddress,
 	// 	MessageProxyCACert:  proxyCACertFile,
@@ -285,6 +324,12 @@ func NewOctarineAdapter(port string, proxyAddress string, proxyCACertFile string
 		return nil, err
 	}
 
+	serviceManager, err := NewFromFile(flagsFile)
+
+	if err != nil {
+		return nil, err
+	}
+
 	if port == "" {
 		port = "0"
 	}
@@ -294,11 +339,12 @@ func NewOctarineAdapter(port string, proxyAddress string, proxyCACertFile string
 	}
 
 	s := &OctarineAdapter{
-		listener: listener,
-		octarine: l,
+		listener:       listener,
+		octarine:       l,
+		serviceManager: serviceManager,
 	}
 
-	fmt.Printf("listening on \"%v\"\n", s.Addr())
+	log.Printf("listening on \"%v\"\n", s.Addr())
 	s.server = grpc.NewServer()
 	authorization.RegisterHandleAuthorizationServiceServer(s.server, s)
 	logentry.RegisterHandleLogEntryServiceServer(s.server, s)
