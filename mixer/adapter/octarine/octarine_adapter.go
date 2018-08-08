@@ -219,7 +219,7 @@ func (s *OctarineAdapter) HandleAuthorization(ctx context.Context, authRequest *
 	var isIncoming int
 
 	if outbound {
-		isIncoming = 2
+		isIncoming = 0
 		request = liboctarine.ExternalRequest{
 			Protocol:         instance.Action.Properties["protocol"].GetStringValue(),
 			MessageID:        0,
