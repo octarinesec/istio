@@ -25,25 +25,39 @@ spec:
   timestamp: request.time
   variables:
     sourceIp: source.ip | ip("0.0.0.0")
-    sourceAddress: source.service | ""
     # sourcePort: source.port | 0
     sourceName: source.name | ""
+    sourcePrincipal: source.principal | ""
     sourceUid: source.uid | ""
     sourceNamespace: source.namespace | ""
     sourceVersion: source.labels["version"] | "unknown"
+    sourceOwner: source.owner | ""
+    sourceWorkloadUid: source.workload.uid | ""
+    sourceWorkloadName: source.workload.name | ""
+    sourceWorkloadNamespace: source.workload.namespace | ""
     destinationIp: destination.ip | ip("0.0.0.0")
-    destinationAddress: destination.service | ""
-    # destinationPort: destination.port | 0
+    destinationServiceHost: destination.service.host | ""
+    destinationPort: destination.port | 0
     destinationName: destination.name | ""
+    destinationPrincipal: destination.principal | ""
     destinationUid: destination.uid | ""
     destinationNamespace: destination.namespace | ""
     destinationVersion: destination.labels["version"] | "unknown"
+    destinationOwner: destination.owner | ""
+    destinationWorkloadUid: destination.workload.uid | ""
+    destinationWorkloadName: destination.workload.name | ""
+    destinationWorkloadNamespace: destination.workload.namespace | ""
+    destinationServiceUid: destination.service.uid | ""
+    destinationServiceName: destination.service.name | ""
+    destinationServiceNamespace: destination.service.namespace | ""
     destinationLabels: destination.labels | emptyStringMap()
     protocol: request.scheme | ""
     method: request.method | ""
     endpoint: request.path | ""
     code: response.code | 0
     responseDuration: response.duration | "0ms"
+  timestamp: request.time
+  severity: '"Default"'
   monitored_resource_type: '"UNSPECIFIED"'
 ---
 # instance configuration for template 'authorization'
@@ -58,12 +72,16 @@ spec:
     groups: request.auth.principal | ""
     properties:
       sourceIp: source.ip | ip("0.0.0.0")
-      sourceAddress: source.service | ""
       # sourcePort: source.port | 0
       sourceName: source.name | ""
+      sourcePrincipal: source.principal | ""
       sourceUid: source.uid | ""
       sourceNamespace: source.namespace | ""
       sourceVersion: source.labels["version"] | "unknown"
+      sourceOwner: source.owner | ""
+      sourceWorkloadUid: source.workload.uid | ""
+      sourceWorkloadName: source.workload.name | ""
+      sourceWorkloadNamespace: source.workload.namespace | ""
   action:
     namespace: destination.namespace | ""
     service: destination.service | ""
@@ -72,12 +90,21 @@ spec:
     properties:
       protocol: request.scheme | ""
       destinationIp: destination.ip | ip("0.0.0.0")
-      destinationAddress: destination.service | ""
-      # destinationPort: destination.port | 0
+      destinationServiceHost: destination.service.host | ""
+      destinationPort: destination.port | 0
       destinationName: destination.name | ""
+      destinationPrincipal: destination.principal | ""
       destinationUid: destination.uid | ""
       destinationNamespace: destination.namespace | ""
       destinationVersion: destination.labels["version"] | "unknown"
+      destinationOwner: destination.owner | ""
+      destinationWorkloadUid: destination.workload.uid | ""
+      destinationWorkloadName: destination.workload.name | ""
+      destinationWorkloadNamespace: destination.workload.namespace | ""
+      destinationServiceUid: destination.service.uid | ""
+      destinationServiceName: destination.service.name | ""
+      destinationServiceNamespace: destination.service.namespace | ""
+      destinationLabels: destination.labels | emptyStringMap()
 ---
 # handler configuration for adapter 'octarine'
 apiVersion: "config.istio.io/v1alpha2"
