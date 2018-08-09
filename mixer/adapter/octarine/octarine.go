@@ -13,7 +13,7 @@ import (
 
 	"github.com/gogo/googleapis/google/rpc"
 	"golang.octarinesec.com/liboctarine"
-	"istio.io/istio/mixer/adapter/octarine_compiled/config"
+	"istio.io/istio/mixer/adapter/octarine/config"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/template/authorization"
 	"istio.io/istio/mixer/template/logentry"
@@ -290,47 +290,23 @@ func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Inst
 			}
 		}()
 
-		// If the response duration is 0, we're most likely outbound
-		zeroDuration, _ := time.ParseDuration("0ms")
-		outbound := instance.Variables["responseDuration"].(time.Duration) == zeroDuration
-
-		var request liboctarine.ExternalRequest
-		var isIncoming int
-
-		if outbound {
-			isIncoming = 2
-			request = liboctarine.ExternalRequest{
-				Protocol:         instance.Variables["protocol"].(string),
-				MessageID:        0,
-				RemoteMessageID:  0,
-				LocalSocketInfo:  sourceSocket,
-				LocalInstanceID:  instance.Variables["sourceUid"].(string),
-				LocalServiceID:   sourceService,
-				LocalVersion:     instance.Variables["sourceVersion"].(string),
-				RemoteSocketInfo: destinationSocket,
-				RemoteInstanceID: instance.Variables["destinationUid"].(string),
-				RemoteServiceID:  destinationService,
-				RemoteVersion:    instance.Variables["destinationVersion"].(string),
-				Endpoint:         fmt.Sprintf("path:%s", instance.Variables["endpoint"].(string)),
-				Method:           instance.Variables["method"].(string),
-			}
-		} else {
-			isIncoming = 1
-			request = liboctarine.ExternalRequest{
-				Protocol:         instance.Variables["protocol"].(string),
-				MessageID:        0,
-				RemoteMessageID:  0,
-				LocalSocketInfo:  destinationSocket,
-				LocalInstanceID:  instance.Variables["destinationUid"].(string),
-				LocalServiceID:   destinationService,
-				LocalVersion:     instance.Variables["destinationVersion"].(string),
-				RemoteSocketInfo: sourceSocket,
-				RemoteInstanceID: instance.Variables["sourceUid"].(string),
-				RemoteServiceID:  sourceService,
-				RemoteVersion:    instance.Variables["sourceVersion"].(string),
-				Endpoint:         fmt.Sprintf("path:%s", instance.Variables["endpoint"].(string)),
-				Method:           instance.Variables["method"].(string),
-			}
+		// Istio triggers a logentry once the communication is complete, and only one message
+		// is sent. Hardcoding isIncoming to 1 for the request processing.
+		isIncoming := 1
+		request := liboctarine.ExternalRequest{
+			Protocol:         instance.Variables["protocol"].(string),
+			MessageID:        0,
+			RemoteMessageID:  0,
+			LocalSocketInfo:  destinationSocket,
+			LocalInstanceID:  instance.Variables["destinationUid"].(string),
+			LocalServiceID:   destinationService,
+			LocalVersion:     instance.Variables["destinationVersion"].(string),
+			RemoteSocketInfo: sourceSocket,
+			RemoteInstanceID: instance.Variables["sourceUid"].(string),
+			RemoteServiceID:  sourceService,
+			RemoteVersion:    instance.Variables["sourceVersion"].(string),
+			Endpoint:         fmt.Sprintf("path:%s", instance.Variables["endpoint"].(string)),
+			Method:           instance.Variables["method"].(string),
 		}
 
 		code := h.octarine.HandleP2PRequest(true, liboctarine.CheckAndLog, isIncoming, request)
