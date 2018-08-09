@@ -1,0 +1,104 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: octarines.config.istio.io
+  labels:
+    package: octarine
+    istio: mixer-adapter
+spec:
+  group: config.istio.io
+  names:
+    kind: octarine
+    plural: octarines
+    singular: octarine
+  scope: Namespaced
+  version: v1alpha2
+---
+# instance configuration for template 'logentry'
+apiVersion: "config.istio.io/v1alpha2"
+kind: logentry
+metadata:
+  name: octarinelog
+  namespace: istio-system
+spec:
+  severity: '"Default"'
+  timestamp: request.time
+  variables:
+    sourceIp: source.ip | ip("0.0.0.0")
+    sourceAddress: source.service | ""
+    # sourcePort: source.port | 0
+    sourceName: source.name | ""
+    sourceUid: source.uid | ""
+    sourceNamespace: source.namespace | ""
+    sourceVersion: source.labels["version"] | "unknown"
+    destinationIp: destination.ip | ip("0.0.0.0")
+    destinationAddress: destination.service | ""
+    # destinationPort: destination.port | 0
+    destinationName: destination.name | ""
+    destinationUid: destination.uid | ""
+    destinationNamespace: destination.namespace | ""
+    destinationVersion: destination.labels["version"] | "unknown"
+    destinationLabels: destination.labels | emptyStringMap()
+    protocol: request.scheme | ""
+    method: request.method | ""
+    endpoint: request.path | ""
+    code: response.code | 0
+    responseDuration: response.duration | "0ms"
+  monitored_resource_type: '"UNSPECIFIED"'
+---
+# instance configuration for template 'authorization'
+apiVersion: "config.istio.io/v1alpha2"
+kind: authorization
+metadata:
+  name: octarineauth
+  namespace: istio-system
+spec:
+  subject:
+    user: request.auth.principal | ""
+    groups: request.auth.principal | ""
+    properties:
+      sourceIp: source.ip | ip("0.0.0.0")
+      sourceAddress: source.service | ""
+      # sourcePort: source.port | 0
+      sourceName: source.name | ""
+      sourceUid: source.uid | ""
+      sourceNamespace: source.namespace | ""
+      sourceVersion: source.labels["version"] | "unknown"
+  action:
+    namespace: destination.namespace | ""
+    service: destination.service | ""
+    method: request.method | ""
+    path: request.path | ""
+    properties:
+      protocol: request.scheme | ""
+      destinationIp: destination.ip | ip("0.0.0.0")
+      destinationAddress: destination.service | ""
+      # destinationPort: destination.port | 0
+      destinationName: destination.name | ""
+      destinationUid: destination.uid | ""
+      destinationNamespace: destination.namespace | ""
+      destinationVersion: destination.labels["version"] | "unknown"
+---
+# handler configuration for adapter 'octarine'
+apiVersion: "config.istio.io/v1alpha2"
+kind: octarine
+metadata:
+  name: octarinehandler
+  namespace: istio-system
+spec:
+  flagsFile: "/octarine_id/gflags"
+  deployment: "cloud:aws"
+---
+# rule to dispatch to handler
+apiVersion: "config.istio.io/v1alpha2"
+kind: rule
+metadata:
+  name: octarinerule
+  namespace: istio-system
+spec:
+  match: "true"
+  actions:
+  - handler: octarinehandler.octarine
+    instances:
+    - octarinelog.logentry
+    - octarineauth.authorization

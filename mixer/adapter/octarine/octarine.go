@@ -5,15 +5,15 @@ package octarine
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/gogo/googleapis/google/rpc"
 	"golang.octarinesec.com/liboctarine"
-	"istio.io/istio/mixer/adapter/octarine/config"
+	"istio.io/istio/mixer/adapter/octarine_compiled/config"
 	"istio.io/istio/mixer/pkg/adapter"
 	"istio.io/istio/mixer/template/authorization"
 	"istio.io/istio/mixer/template/logentry"
@@ -27,6 +27,7 @@ type (
 	}
 	handler struct {
 		octarine           liboctarine.LibOctarine
+		serviceManager     *ServiceManager
 		deployment         string
 		logentryTypes      map[string]*logentry.Type
 		authorizationTypes map[string]*authorization.Type
@@ -46,14 +47,22 @@ var _ authorization.Handler = &handler{}
 // adapter.HandlerBuilder#Build
 func (b *builder) Build(ctx context.Context, env adapter.Env) (adapter.Handler, error) {
 	var l liboctarine.LibOctarine
+	var s *ServiceManager
+	var err error
 
 	if b.adpCfg.FlagsFile != "" {
-		if _, err := os.Stat(b.adpCfg.FlagsFile); os.IsNotExist(err) {
+		if _, err = os.Stat(b.adpCfg.FlagsFile); os.IsNotExist(err) {
 			return nil, fmt.Errorf("FlagsFile '%s' does not exist", b.adpCfg.FlagsFile)
 		}
 
 		l = liboctarine.LibOctarine{
 			FlagsFileName: b.adpCfg.FlagsFile,
+		}
+
+		s, err = NewFromFile(b.adpCfg.FlagsFile)
+
+		if err != nil {
+			return nil, err
 		}
 	} else {
 		l = liboctarine.LibOctarine{
@@ -66,11 +75,22 @@ func (b *builder) Build(ctx context.Context, env adapter.Env) (adapter.Handler, 
 	}
 
 	l.Init()
+
+	if b.adpCfg.FlagsFile == "" {
+		// /tmp/flags is created by liboctarine.Init(). Use it if a flags file has not been created.
+		s, err = NewFromFile("/tmp/flags")
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &handler{
-		octarine:      l,
-		deployment:    b.adpCfg.Deployment,
-		logentryTypes: b.logentryTypes,
-		env:           env,
+		octarine:       l,
+		serviceManager: s,
+		deployment:     b.adpCfg.Deployment,
+		logentryTypes:  b.logentryTypes,
+		env:            env,
 	}, nil
 }
 
@@ -107,35 +127,40 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 
 	destinationSocket := liboctarine.ExternalSocketInfo{
 		Address: instance.Action.Properties["destinationIp"].(net.IP).String(),
-	}
-
-	sourceName := instance.Subject.Properties["sourceName"].(string)
-	if sourceName == "" {
-		e := strings.Split(instance.Subject.Properties["sourceAddress"].(string), ".")
-		if len(e) > 0 {
-			sourceName = e[0]
-		}
-	}
-
-	destinationName := instance.Action.Properties["destinationName"].(string)
-	if destinationName == "" {
-		e := strings.Split(instance.Action.Service, ".")
-		if len(e) > 0 {
-			destinationName = e[0]
-		}
+		Port:    int(instance.Action.Properties["destinationPort"].(int64)),
 	}
 
 	sourceService := fmt.Sprintf("%s:%s@%s",
-		instance.Subject.Properties["sourceNamespace"].(string),
-		sourceName,
+		instance.Subject.Properties["sourceWorkloadNamespace"].(string),
+		instance.Subject.Properties["sourceWorkloadName"].(string),
 		h.deployment,
 	)
 
 	destinationService := fmt.Sprintf("%s:%s@%s",
-		instance.Action.Namespace,
-		destinationName,
+		instance.Action.Properties["destinationWorkloadNamespace"].(string),
+		instance.Action.Properties["destinationWorkloadName"].(string),
 		h.deployment,
 	)
+
+	sourceInstanceID := instance.Subject.Properties["sourceUid"].(string)
+	destinationInstanceID := instance.Action.Properties["destinationUid"].(string)
+
+	sourceVersion := instance.Subject.Properties["sourceVersion"].(string)
+	destinationVersion := instance.Action.Properties["destinationVersion"].(string)
+
+	destinationHostname := instance.Action.Properties["destinationServiceHost"].(string)
+
+	go func() {
+		if err := h.serviceManager.ObserveInstance(
+			sourceService, sourceInstanceID, sourceVersion, ""); err != nil {
+			log.Printf("failed to register instance %s: %v", sourceService, err)
+		}
+		if err := h.serviceManager.ObserveInstance(
+			destinationService, destinationInstanceID, destinationVersion,
+			destinationHostname); err != nil {
+			log.Printf("failed to register instance %s: %v", destinationService, err)
+		}
+	}()
 
 	var outbound bool
 	// If the destination UID is empty, this is egress traffic which means it's outbound.
@@ -149,7 +174,7 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 	var isIncoming int
 
 	if outbound {
-		isIncoming = 2
+		isIncoming = 0
 		request = liboctarine.ExternalRequest{
 			Protocol:         instance.Action.Properties["protocol"].(string),
 			MessageID:        0,
@@ -230,35 +255,40 @@ func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Inst
 
 		destinationSocket := liboctarine.ExternalSocketInfo{
 			Address: instance.Variables["destinationIp"].(net.IP).String(),
-		}
-
-		sourceName := instance.Variables["sourceName"].(string)
-		if sourceName == "" {
-			e := strings.Split(instance.Variables["sourceAddress"].(string), ".")
-			if len(e) > 0 {
-				sourceName = e[0]
-			}
-		}
-
-		destinationName := instance.Variables["destinationName"].(string)
-		if destinationName == "" {
-			e := strings.Split(instance.Variables["destinationAddress"].(string), ".")
-			if len(e) > 0 {
-				destinationName = e[0]
-			}
+			Port:    int(instance.Variables["destinationPort"].(int64)),
 		}
 
 		sourceService := fmt.Sprintf("%s:%s@%s",
-			instance.Variables["sourceNamespace"].(string),
-			sourceName,
+			instance.Variables["sourceWorkloadNamespace"].(string),
+			instance.Variables["sourceWorkloadName"].(string),
 			h.deployment,
 		)
 
 		destinationService := fmt.Sprintf("%s:%s@%s",
-			instance.Variables["destinationNamespace"].(string),
-			destinationName,
+			instance.Variables["destinationWorkloadNamespace"].(string),
+			instance.Variables["destinationWorkloadName"].(string),
 			h.deployment,
 		)
+
+		sourceInstanceID := instance.Variables["sourceUid"].(string)
+		destinationInstanceID := instance.Variables["destinationUid"].(string)
+
+		sourceVersion := instance.Variables["sourceVersion"].(string)
+		destinationVersion := instance.Variables["destinationVersion"].(string)
+
+		destinationHostname := instance.Variables["destinationServiceHost"].(string)
+
+		go func() {
+			if err := h.serviceManager.ObserveInstance(
+				sourceService, sourceInstanceID, sourceVersion, ""); err != nil {
+				log.Printf("failed to register instance %s: %v", sourceService, err)
+			}
+			if err := h.serviceManager.ObserveInstance(
+				destinationService, destinationInstanceID, destinationVersion,
+				destinationHostname); err != nil {
+				log.Printf("failed to register instance %s: %v", destinationService, err)
+			}
+		}()
 
 		// If the response duration is 0, we're most likely outbound
 		zeroDuration, _ := time.ParseDuration("0ms")
