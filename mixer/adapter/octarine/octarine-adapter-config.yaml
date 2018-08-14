@@ -114,7 +114,7 @@ metadata:
   namespace: istio-system
 spec:
   flagsFile: "/octarine_id/gflags"
-  deployment: "cloud:aws"
+  deployment: "cloud:aws-west"
 ---
 # rule to dispatch to handler
 apiVersion: "config.istio.io/v1alpha2"
