@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"golang.octarinesec.com/activity_log/cache"
-	"golang.octarinesec.com/config/clientsession"
-	"golang.octarinesec.com/config/ginutils"
+	"golang.octarinesec.com/common/cache"
+	"golang.octarinesec.com/common/clientsession"
+	"golang.octarinesec.com/common/ginutils"
 )
 
 type ServiceManager struct {
