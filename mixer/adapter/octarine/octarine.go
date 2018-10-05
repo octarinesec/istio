@@ -35,6 +35,8 @@ type (
 	}
 )
 
+var localHandler *handler
+
 // ensure types implement the requisite interfaces
 var _ logentry.HandlerBuilder = &builder{}
 var _ logentry.Handler = &handler{}
@@ -50,6 +52,9 @@ func (b *builder) Build(ctx context.Context, env adapter.Env) (adapter.Handler, 
 	var s *ServiceManager
 	var err error
 
+	if localHandler != nil {
+		return localHandler, nil
+	}
 	if b.adpCfg.FlagsFile != "" {
 		if _, err = os.Stat(b.adpCfg.FlagsFile); os.IsNotExist(err) {
 			return nil, fmt.Errorf("FlagsFile '%s' does not exist", b.adpCfg.FlagsFile)
@@ -85,13 +90,14 @@ func (b *builder) Build(ctx context.Context, env adapter.Env) (adapter.Handler, 
 		}
 	}
 
-	return &handler{
+	localHandler = &handler{
 		octarine:       l,
 		serviceManager: s,
 		deployment:     b.adpCfg.Deployment,
 		logentryTypes:  b.logentryTypes,
 		env:            env,
-	}, nil
+	}
+	return localHandler, nil
 }
 
 // adapter.HandlerBuilder#SetAdapterConfig
