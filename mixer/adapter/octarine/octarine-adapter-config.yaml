@@ -22,7 +22,7 @@ metadata:
   namespace: istio-system
 spec:
   severity: '"Default"'
-  timestamp: request.time
+  timestamp: request.time | timestamp("1970-01-01T00:00:00Z")
   variables:
     sourceIp: source.ip | ip("0.0.0.0")
     # sourcePort: source.port | 0
@@ -51,12 +51,12 @@ spec:
     destinationServiceName: destination.service.name | ""
     destinationServiceNamespace: destination.service.namespace | ""
     destinationLabels: destination.labels | emptyStringMap()
-    protocol: request.scheme | ""
+    protocol: request.scheme | "tcp"
     method: request.method | ""
     endpoint: request.path | ""
     code: response.code | 0
     responseDuration: response.duration | "0ms"
-  timestamp: request.time
+  timestamp: request.time | timestamp("1970-01-01T00:00:00Z")
   severity: '"Default"'
   monitored_resource_type: '"UNSPECIFIED"'
 ---
@@ -88,7 +88,7 @@ spec:
     method: request.method | ""
     path: request.path | ""
     properties:
-      protocol: request.scheme | ""
+      protocol: request.scheme | "tcp"
       destinationIp: destination.ip | ip("0.0.0.0")
       destinationServiceHost: destination.service.host | ""
       destinationPort: destination.port | 0
