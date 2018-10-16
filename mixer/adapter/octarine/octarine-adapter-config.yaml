@@ -51,6 +51,8 @@ spec:
     destinationServiceName: destination.service.name | ""
     destinationServiceNamespace: destination.service.namespace | ""
     destinationLabels: destination.labels | emptyStringMap()
+    requestHeaders: request.headers | emptyStringMap()
+    responseHeaders: response.headers | emptyStringMap()
     protocol: request.scheme | "tcp"
     method: request.method | ""
     endpoint: request.path | ""

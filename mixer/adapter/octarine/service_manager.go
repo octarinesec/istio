@@ -92,7 +92,7 @@ func (m *ServiceManager) populateCache() error {
 	}
 
 	// If there's a current cache, overwrite it.
-	artCache := cache.New(10*time.Minute, 1*time.Minute)
+	artCache := cache.New("artifact_cache", 10*time.Minute, 1*time.Minute)
 
 	for _, a := range arts {
 		name := fmt.Sprintf("%s:%s", a.Group, a.Member)
@@ -117,7 +117,7 @@ func (m *ServiceManager) populateCache() error {
 	}
 
 	// If there's a current cache, overwrite it.
-	depCache := cache.New(10*time.Minute, 1*time.Minute)
+	depCache := cache.New("deployment_cache", 10*time.Minute, 1*time.Minute)
 
 	for _, d := range deps {
 		name := fmt.Sprintf("%s:%s", d.Group, d.Member)
