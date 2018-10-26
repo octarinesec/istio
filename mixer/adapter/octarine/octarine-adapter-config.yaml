@@ -58,8 +58,6 @@ spec:
     endpoint: request.path | ""
     code: response.code | 0
     responseDuration: response.duration | "0ms"
-  timestamp: request.time | timestamp("1970-01-01T00:00:00Z")
-  severity: '"Default"'
   monitored_resource_type: '"UNSPECIFIED"'
 ---
 # instance configuration for template 'authorization'
