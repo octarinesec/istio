@@ -248,8 +248,6 @@ func (h *handler) HandleAuthorization(ctx context.Context, instance *authorizati
 // logentry.Handler#HandleLogEntry
 func (h *handler) HandleLogEntry(ctx context.Context, instances []*logentry.Instance) error {
 	for _, instance := range instances {
-		fmt.Printf("instance variables: %+v\n", instance.Variables)
-
 		if _, ok := h.logentryTypes[instance.Name]; !ok {
 			h.env.Logger().Errorf("Cannot find Type for instance %s", instance.Name)
 			continue
