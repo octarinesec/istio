@@ -53,6 +53,10 @@ func (b *builder) Build(ctx context.Context, env adapter.Env) (adapter.Handler, 
 	var err error
 
 	if localHandler != nil {
+		// Update values that come from the adapter Build
+		localHandler.logentryTypes = b.logentryTypes
+		localHandler.deployment = b.adpCfg.Deployment
+		localHandler.env = env
 		return localHandler, nil
 	}
 	if b.adpCfg.FlagsFile != "" {
